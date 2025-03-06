@@ -252,18 +252,18 @@ func buildDownloadPage(mainWindow fyne.Window) fyne.CanvasObject {
 		mainWindow.SetContent(buildMainPage(mainWindow))
 	})
 
-	downloadButton := widget.NewButton("下载", func() {
+	downloadButton := widget.NewButton("安装", func() {
 		if selectedFile != nil {
 			go func() {
 				fName := strings.Replace(selectedFile.Filename, ".tar.gz", "", 1)
 				if err := downloadAndExtract(selectedFile.Filename, fName); err != nil {
 					dialog.ShowError(err, mainWindow)
 				} else {
-					dialog.ShowInformation("下载成功", "文件已安装", mainWindow)
+					dialog.ShowInformation("安装成功", "文件已安装", mainWindow)
 				}
 			}()
 		} else {
-			dialog.ShowInformation("下载失败", "未选择任何文件", mainWindow)
+			dialog.ShowInformation("安装失败", "未选择任何文件", mainWindow)
 		}
 	})
 
