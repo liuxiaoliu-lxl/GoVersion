@@ -293,7 +293,7 @@ func buildDownloadPage(mainWindow fyne.Window) fyne.CanvasObject {
 	// **最终页面**
 	return container.NewBorder(
 		selectContainer,
-		container.NewVBox(buttonContainer, loadingBar), // **把 Loading 进度条放到按钮下方**
+		container.NewVBox(loadingBar, buttonContainer), // **把 Loading 进度条放到按钮下方**
 		nil, nil, fileList,
 	)
 }
