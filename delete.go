@@ -39,7 +39,7 @@ func buildDeletePage(mainWindow fyne.Window) fyne.CanvasObject {
 		}
 	}
 
-	deleteButton := widget.NewButton("删除", func() {
+	deleteButton := widget.NewButton("卸载", func() {
 		if selectedValue != "" {
 			targetPath := filepath.Join(HomeDir, workDir, GoRootDirName, selectedValue)
 			err := os.RemoveAll(targetPath)
