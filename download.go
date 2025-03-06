@@ -166,6 +166,7 @@ func buildDownloadPage(mainWindow fyne.Window) fyne.CanvasObject {
 	for os := range osGroups {
 		osList = append(osList, os)
 	}
+	sort.Strings(osList)
 
 	// 当前系统
 	currentOS := detectCurrentOS()

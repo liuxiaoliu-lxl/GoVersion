@@ -20,12 +20,12 @@ func fetchGoVersions() ([]GoVersion, error) {
 		return nil, err
 	}
 
-	var versions []GoVersion
-	if err := json.Unmarshal(body, &versions); err != nil {
+	var vs []GoVersion
+	if err := json.Unmarshal(body, &vs); err != nil {
 		return nil, err
 	}
 
-	return versions, nil
+	return vs, nil
 }
 
 func fetchGoVersionsFromWeb() ([]GoVersion, error) {
@@ -41,7 +41,7 @@ func fetchGoVersionsFromWeb() ([]GoVersion, error) {
 		return nil, err
 	}
 
-	var versions []GoVersion
+	var vs []GoVersion
 	// Find all versions in the page
 	doc.Find("div.toggleVisible").Each(func(i int, s *goquery.Selection) {
 		version := s.AttrOr("id", "")
@@ -80,7 +80,7 @@ func fetchGoVersionsFromWeb() ([]GoVersion, error) {
 		})
 
 		// Append the version with its files to the versions list
-		versions = append(versions, GoVersion{
+		vs = append(vs, GoVersion{
 			Version: version,
 			Stable:  strings.Contains(version, "go1"),
 			Files:   files,
@@ -116,12 +116,12 @@ func fetchGoVersionsFromWeb() ([]GoVersion, error) {
 			}
 		})
 
-		versions = append(versions, GoVersion{
+		vs = append(vs, GoVersion{
 			Version: version,
 			Stable:  strings.Contains(version, "go1"),
 			Files:   files,
 		})
 	})
 
-	return versions, nil
+	return vs, nil
 }
