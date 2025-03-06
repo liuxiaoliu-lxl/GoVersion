@@ -33,7 +33,7 @@ func buildMainPage(mainWindow fyne.Window) fyne.CanvasObject {
 			return widget.NewLabel("")
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
-			texts := []string{"切换", "下载", "删除", "新特性"}
+			texts := []string{"切换", "安装", "卸载", "新特性"}
 			o.(*widget.Label).SetText(texts[i])
 		},
 	)

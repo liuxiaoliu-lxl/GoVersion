@@ -50,10 +50,7 @@ func buildSwitchPage(mainWindow fyne.Window) fyne.CanvasObject {
 		mainWindow.SetContent(buildMainPage(mainWindow))
 	})
 
-	buttonContainer := container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(ButtonWidth, ButtonHeight), returnButton),
-		container.NewGridWrap(fyne.NewSize(ButtonWidth, ButtonHeight), switchButton),
-	)
+	buttonContainer := container.NewGridWithColumns(2, returnButton, switchButton)
 
 	return container.NewBorder(nil, buttonContainer, nil, nil, list)
 }

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -30,6 +31,25 @@ type GoVersion struct {
 	Version string   `json:"version"`
 	Stable  bool     `json:"stable"`
 	Files   []GoFile `json:"files"`
+}
+
+// 检测当前 OS
+func detectCurrentOS() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "macOS"
+	case "linux":
+		return "Linux"
+	case "windows":
+		return "Windows"
+	default:
+		return runtime.GOOS
+	}
+}
+
+// 检测当前架构
+func detectCurrentArch() string {
+	return runtime.GOARCH
 }
 
 func downloadAndExtract(filename, version string) error {
@@ -120,66 +140,114 @@ func downloadAndExtract(filename, version string) error {
 }
 
 func buildDownloadPage(mainWindow fyne.Window) fyne.CanvasObject {
-	//// 获取原有版本数据
-	//versions, err := fetchGoVersions()
-	//if err != nil {
-	//	dialog.ShowError(err, mainWindow)
-	//	return nil
-	//}
-
 	var err error
 	if versions == nil || len(versions) == 0 {
-		// 获取网页上抓取的版本数据
 		versions, err = fetchGoVersionsFromWeb()
 		if err != nil {
 			fmt.Println("err : ", err.Error())
 		}
 	}
 
-	osGroups := make(map[string][]GoFile)
+	// 分组数据
+	osGroups := make(map[string]map[string][]GoFile) // OS -> Arch -> Files
 	for _, v := range versions {
 		for _, file := range v.Files {
-			if file.OS != "" && strings.ToLower(file.Kind) == "archive" {
-				osGroups[file.OS] = append(osGroups[file.OS], file)
+			if file.OS == "" || strings.ToLower(file.Kind) != "archive" {
+				continue
 			}
+			if osGroups[file.OS] == nil {
+				osGroups[file.OS] = make(map[string][]GoFile)
+			}
+			osGroups[file.OS][file.Arch] = append(osGroups[file.OS][file.Arch], file)
 		}
 	}
 
+	// OS 列表
 	var osList []string
 	for os := range osGroups {
 		osList = append(osList, os)
 	}
 	sort.Strings(osList)
 
-	for i := 0; i < len(osList); i++ {
-		if osList[i] == "macOS" {
-			osList[i], osList[0] = osList[0], osList[i]
-		}
-		if osList[i] == "Linux" {
-			osList[i], osList[1] = osList[1], osList[i]
+	// 当前系统
+	currentOS := detectCurrentOS()
+	currentArch := detectCurrentArch()
+
+	// OS 选择框
+	osSelect := widget.NewSelect(osList, nil)
+	osSelect.SetSelected(currentOS)
+
+	// Arch 选择框
+	archSelect := widget.NewSelect(nil, nil)
+
+	var selectedFile *GoFile
+	var files []GoFile
+
+	// 文件列表
+	fileList := widget.NewList(
+		func() int { return len(files) },
+		func() fyne.CanvasObject { return widget.NewLabel("") },
+		func(i widget.ListItemID, o fyne.CanvasObject) {
+			o.(*widget.Label).SetText(fmt.Sprintf("%s (%s)", files[i].Filename, files[i].Arch))
+		},
+	)
+	fileList.OnSelected = func(i widget.ListItemID) {
+		selectedFile = &files[i]
+	}
+
+	// 更新 Arch 选择框
+	updateArchSelect := func(selectedOS string) {
+		if archs, exists := osGroups[selectedOS]; exists {
+			var archList []string
+			for arch := range archs {
+				archList = append(archList, arch)
+			}
+			sort.Strings(archList)
+			archSelect.Options = archList
+			if len(archList) > 0 {
+				archSelect.SetSelected(archList[0])
+			}
 		}
 	}
 
-	osSelect := widget.NewSelect(osList, nil)
-	var selectedFile *GoFile
-	fileList := widget.NewList(
-		func() int { return 0 },
-		func() fyne.CanvasObject { return widget.NewLabel("") },
-		func(i widget.ListItemID, o fyne.CanvasObject) {},
-	)
-
-	osSelect.OnChanged = func(selectedOS string) {
-		files := osGroups[selectedOS]
-		fileList.Length = func() int { return len(files) }
-		fileList.UpdateItem = func(i widget.ListItemID, o fyne.CanvasObject) {
-			o.(*widget.Label).SetText(fmt.Sprintf("%s (%s)", files[i].Filename, files[i].Arch))
-		}
-		fileList.OnSelected = func(i widget.ListItemID) {
-			selectedFile = &files[i]
+	// 更新文件列表
+	updateFileList := func(selectedOS, selectedArch string) {
+		if archs, exists := osGroups[selectedOS]; exists {
+			if filesForArch, exists := archs[selectedArch]; exists {
+				files = filesForArch
+			} else {
+				files = nil
+			}
+		} else {
+			files = nil
 		}
 		fileList.Refresh()
 	}
 
+	// **监听 OS 变化**
+	osSelect.OnChanged = func(selectedOS string) {
+		updateArchSelect(selectedOS) // 更新架构选项
+		if archSelect.Selected != "" {
+			updateFileList(selectedOS, archSelect.Selected)
+		}
+	}
+
+	// **监听 Arch 变化**
+	archSelect.OnChanged = func(selectedArch string) {
+		updateFileList(osSelect.Selected, selectedArch)
+	}
+
+	// **初始化 UI**
+	updateArchSelect(currentOS)
+	if archSelect.Selected == "" {
+		archSelect.SetSelected(currentArch) // 选中当前架构
+	}
+	updateFileList(currentOS, archSelect.Selected)
+
+	// **两级筛选项并排**
+	selectContainer := container.NewGridWithColumns(2, osSelect, archSelect)
+
+	// **下载 & 返回按钮（各占50%）**
 	returnButton := widget.NewButton("返回", func() {
 		mainWindow.SetContent(buildMainPage(mainWindow))
 	})
@@ -199,10 +267,8 @@ func buildDownloadPage(mainWindow fyne.Window) fyne.CanvasObject {
 		}
 	})
 
-	buttonContainer := container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(ButtonWidth, ButtonHeight), returnButton),
-		container.NewGridWrap(fyne.NewSize(ButtonWidth, ButtonHeight), downloadButton),
-	)
+	buttonContainer := container.NewGridWithColumns(2, returnButton, downloadButton)
 
-	return container.NewBorder(osSelect, buttonContainer, nil, nil, fileList)
+	// **最终页面**
+	return container.NewBorder(selectContainer, buttonContainer, nil, nil, fileList)
 }
