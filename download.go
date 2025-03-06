@@ -138,7 +138,6 @@ func downloadAndExtract(filename, version string) error {
 	}
 	return nil
 }
-
 func buildDownloadPage(mainWindow fyne.Window) fyne.CanvasObject {
 	var err error
 	if versions == nil || len(versions) == 0 {
@@ -149,7 +148,7 @@ func buildDownloadPage(mainWindow fyne.Window) fyne.CanvasObject {
 	}
 
 	// 分组数据
-	osGroups := make(map[string]map[string][]GoFile) // OS -> Arch -> Files
+	osGroups := make(map[string]map[string][]GoFile)
 	for _, v := range versions {
 		for _, file := range v.Files {
 			if file.OS == "" || strings.ToLower(file.Kind) != "archive" {
@@ -183,7 +182,11 @@ func buildDownloadPage(mainWindow fyne.Window) fyne.CanvasObject {
 	var selectedFile *GoFile
 	var files []GoFile
 
-	// 文件列表
+	// **进度条 (默认隐藏)**
+	loadingBar := widget.NewProgressBarInfinite()
+	loadingBar.Hide()
+
+	// **文件列表**
 	fileList := widget.NewList(
 		func() int { return len(files) },
 		func() fyne.CanvasObject { return widget.NewLabel("") },
@@ -247,16 +250,33 @@ func buildDownloadPage(mainWindow fyne.Window) fyne.CanvasObject {
 	// **两级筛选项并排**
 	selectContainer := container.NewGridWithColumns(2, osSelect, archSelect)
 
-	// **下载 & 返回按钮（各占50%）**
+	// **提前声明 downloadButton**
+	var downloadButton *widget.Button
+
+	// **返回按钮**
 	returnButton := widget.NewButton("返回", func() {
 		mainWindow.SetContent(buildMainPage(mainWindow))
 	})
 
-	downloadButton := widget.NewButton("安装", func() {
+	// **安装按钮**
+	downloadButton = widget.NewButton("安装", func() {
 		if selectedFile != nil {
+			// **开始安装，显示加载状态**
+			downloadButton.SetText("安装中...")
+			downloadButton.Disable()
+			loadingBar.Show()
+
 			go func() {
 				fName := strings.Replace(selectedFile.Filename, ".tar.gz", "", 1)
-				if err := downloadAndExtract(selectedFile.Filename, fName); err != nil {
+				err := downloadAndExtract(selectedFile.Filename, fName)
+
+				// **安装完成，恢复 UI**
+				loadingBar.Hide()
+				downloadButton.SetText("安装")
+				downloadButton.Enable()
+
+				// 弹窗提示
+				if err != nil {
 					dialog.ShowError(err, mainWindow)
 				} else {
 					dialog.ShowInformation("安装成功", "文件已安装", mainWindow)
@@ -267,8 +287,13 @@ func buildDownloadPage(mainWindow fyne.Window) fyne.CanvasObject {
 		}
 	})
 
+	// **按钮容器**
 	buttonContainer := container.NewGridWithColumns(2, returnButton, downloadButton)
 
 	// **最终页面**
-	return container.NewBorder(selectContainer, buttonContainer, nil, nil, fileList)
+	return container.NewBorder(
+		selectContainer,
+		container.NewVBox(buttonContainer, loadingBar), // **把 Loading 进度条放到按钮下方**
+		nil, nil, fileList,
+	)
 }
